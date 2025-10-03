@@ -165,19 +165,22 @@ This document describes the API endpoints for the order management system with p
 }
 ```
 
-### 4. Update Order Status (Generic)
+### 4. Update Order (Admin Only - Non-Status Fields)
 - **Method**: PUT
 - **URL**: `/api/orders/{id}`
-- **Description**: Update order status
+- **Description**: Update order details (excluding status - only admin can update non-status fields)
 - **Authentication**: Required
 - **Request Body**:
 ```json
 {
-  "status": "completed"
+  "table_number": "Table 10",
+  "user_id": 2
 }
 ```
 - **Validation**:
-  - `status` is required (must be one of: pending, paid, completed)
+  - `table_number` is optional (string, max 255 chars)
+  - `user_id` is optional (must exist in users table)
+  - `status` field is NOT allowed to be updated through this endpoint
 - **Response**:
 ```json
 {
