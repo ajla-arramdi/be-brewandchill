@@ -12,40 +12,8 @@ use Illuminate\Support\Facades\Validator;
 class AuthController extends Controller
 {
     /**
-     * Register a new user
-     */
-    public function register(Request $request)
-    {
-        $validator = Validator::make($request->all(), [
-            'name' => 'required|string|max:255',
-            'email' => 'required|string|email|max:255|unique:users',
-            'password' => 'required|string|min:8|confirmed',
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json(['errors' => $validator->errors()], 422);
-        }
-
-        $user = User::create([
-            'name' => $request->name,
-            'email' => $request->email,
-            'password' => Hash::make($request->password),
-        ]);
-
-        // Assign default 'user' role to new users
-        $user->assignRole('user');
-
-        $token = $user->createToken('auth_token')->plainTextToken;
-
-        return response()->json([
-            'user' => $user,
-            'access_token' => $token,
-            'token_type' => 'Bearer',
-        ]);
-    }
-
-    /**
      * Login user and create token
+     * Access: Admin and Cashier only
      */
     public function login(Request $request)
     {
@@ -66,6 +34,11 @@ class AuthController extends Controller
 
         if (!$user) {
             return response()->json(['message' => 'User not found'], 401);
+        }
+
+        // Only allow admin and cashier to login
+        if (!$user->hasRole('admin') && !$user->hasRole('cashier')) {
+            return response()->json(['message' => 'Access denied. Only admin and cashier can login.'], 403);
         }
 
         $token = $user->createToken('auth_token')->plainTextToken;

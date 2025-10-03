@@ -75,34 +75,55 @@ class OrderController extends Controller
 
     /**
      * Store a newly created order in storage.
-     * Access: All authenticated users can create orders
+     * Access: Guest users (no authentication required) can create orders
+     *          Authenticated users can also create orders on behalf of guests
      */
     public function store(Request $request): JsonResponse
     {
+        // Validate the request
         $request->validate([
+            'guest_name' => 'required_without:auth_user|string|max:255',
             'table_number' => 'required|string|max:255',
-            'user_id' => 'nullable|exists:users,id',
             'items' => 'required|array|min:1',
             'items.*.menu_id' => 'required|exists:menus,id',
             'items.*.quantity' => 'required|integer|min:1',
         ]);
 
-        // Ensure the user creating the order is the authenticated user (or they have admin privileges)
-        $userId = $request->user_id ?? Auth::user()->id;
-        $user = Auth::user();
-        
-        if ($userId !== $user->id && !$user->hasRole('admin')) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Unauthorized to create order for another user'
-            ], 403);
-        }
-
         DB::beginTransaction();
         
         try {
+            // Determine if this is a guest order or an authenticated user order
+            $userId = null;
+            $guestName = null;
+            
+            // Check if the request is authenticated
+            if (Auth::check()) {
+                $user = Auth::user();
+                
+                // Only admin and cashier can create orders on behalf of others
+                if ($user->hasRole('admin') || $user->hasRole('cashier')) {
+                    // If authenticated user, check if they're providing guest info
+                    if ($request->filled('guest_name')) {
+                        $userId = null; // No user account
+                        $guestName = $request->guest_name;
+                    } else {
+                        $userId = $user->id;
+                        $guestName = null;
+                    }
+                } else {
+                    // Regular authenticated user (if any)
+                    $userId = $user->id;
+                    $guestName = null;
+                }
+            } else {
+                // Unauthenticated user (guest) - must provide guest_name
+                $userId = null;
+                $guestName = $request->guest_name;
+            }
+
             $order = Order::create([
                 'user_id' => $userId,
+                'guest_name' => $guestName,
                 'table_number' => $request->table_number,
                 'status' => Order::STATUS_PENDING,
                 'total_price' => 0, // Will be calculated after items are added
@@ -252,7 +273,8 @@ class OrderController extends Controller
         // Validate that status is not being updated (status can only be changed by cashier-specific endpoints)
         $validatedData = $request->validate([
             'table_number' => 'sometimes|required|string|max:255',
-            'user_id' => 'sometimes|required|exists:users,id',
+            'user_id' => 'sometimes|nullable|exists:users,id',
+            'guest_name' => 'sometimes|nullable|string|max:255',
             // Note: 'status' is intentionally excluded from validation to prevent updates
         ]);
 

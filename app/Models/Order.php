@@ -11,6 +11,7 @@ class Order extends Model
 
     protected $fillable = [
         'user_id',
+        'guest_name',
         'table_number',
         'status',
         'total_price',
@@ -41,5 +42,13 @@ class Order extends Model
         return $this->belongsToMany(Menu::class, 'order_items')
                     ->withPivot('quantity', 'price')
                     ->withTimestamps();
+    }
+    
+    /**
+     * Check if order is placed by a guest (without user account)
+     */
+    public function isGuestOrder(): bool
+    {
+        return $this->user_id === null && !empty($this->guest_name);
     }
 }
